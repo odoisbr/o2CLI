@@ -1,8 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import { skillsRoutes } from './skills.routes'
+import { adminRoutes } from './admin.routes'
 import type { UsageRepository } from '../repositories/usage.repository'
+import type { KeysService } from '../services/keys.service'
 
-export async function registerRoutes(server: FastifyInstance, opts: { usageRepo: UsageRepository }) {
+interface RouteOpts {
+  usageRepo: UsageRepository
+  keysService: KeysService
+}
+
+export async function registerRoutes(server: FastifyInstance, opts: RouteOpts) {
   server.get('/health', async () => ({ status: 'ok', ts: new Date().toISOString() }))
   server.register(skillsRoutes, { prefix: '/v1', usageRepo: opts.usageRepo })
+  server.register(adminRoutes, { prefix: '/v1', keysService: opts.keysService })
 }

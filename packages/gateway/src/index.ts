@@ -1,13 +1,15 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
-import fp from 'fastify-plugin'
 import { PrismaClient } from '@prisma/client'
 import Redis from 'ioredis'
 import { registerRoutes } from './routes'
 import { authPlugin } from './plugins/auth.plugin'
+import { adminAuthPlugin } from './plugins/admin-auth.plugin'
 import { makeAuthService } from './services/auth.service'
 import { makeUsageRepository } from './repositories/usage.repository'
+import { makeKeysRepository } from './repositories/keys.repository'
+import { makeKeysService } from './services/keys.service'
 
 const db = new PrismaClient()
 const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')
@@ -21,15 +23,17 @@ const server = Fastify({
   },
 })
 
-// Expõe serviços via decoradores antes dos plugins dependentes
-server.decorate('authService', makeAuthService(db, redis))
-
 const usageRepo = makeUsageRepository(db)
+const keysRepo = makeKeysRepository(db)
+const keysService = makeKeysService(keysRepo, usageRepo)
+
+server.decorate('authService', makeAuthService(db, redis))
 
 server.register(cors, { origin: false })
 server.register(rateLimit, { max: 120, timeWindow: '1 minute', redis })
+server.register(adminAuthPlugin)
 server.register(authPlugin)
-server.register(registerRoutes, { usageRepo })
+server.register(registerRoutes, { usageRepo, keysService })
 
 server.addHook('onClose', async () => {
   await db.$disconnect()
