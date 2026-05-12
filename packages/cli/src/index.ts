@@ -1,7 +1,12 @@
 #!/usr/bin/env bun
+import * as p from '@clack/prompts'
 import { Command } from 'commander'
 import { onboard } from './commands/onboard'
 import { createNew } from './commands/new'
+import { engineExists, readEngine, readO2Config } from './utils/config'
+import { WWW_DIR, MEMORY_DIR } from './utils/fs'
+import { join } from 'path'
+import { o2IngestSkill } from './skills/o2-ingest'
 
 const program = new Command()
 
@@ -20,51 +25,97 @@ program
   .description('Cria um novo projeto gerenciado pelo o2')
   .action(createNew)
 
-// Skills como subcomandos — serão adicionadas conforme implementadas
-const skillCommand = program
+// --- Pipeline de skills ---
+const runCmd = program
   .command('run')
   .description('Executa uma skill do pipeline o2')
 
-skillCommand
+runCmd
   .command('ingest')
   .description('Vetoriza regras de negócio do domínio local')
-  .option('-p, --project <name>', 'Nome do projeto')
-  .action(() => { console.log('o2-ingest — em implementação') })
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
+  .action(async (opts: { project: string }) => {
+    p.intro(`o2 run ingest — ${opts.project}`)
 
-skillCommand
+    if (!engineExists()) {
+      p.cancel('Motor não configurado. Execute `o2 onboard` primeiro.')
+      process.exit(1)
+    }
+
+    const engine = readEngine()
+    const workspacePath = join(WWW_DIR, opts.project)
+    const memoryPath = join(MEMORY_DIR, opts.project)
+
+    let config
+    try {
+      config = readO2Config(workspacePath)
+    } catch {
+      p.cancel(`Projeto "${opts.project}" não encontrado. Execute \`o2 new\` primeiro.`)
+      process.exit(1)
+    }
+
+    const s = p.spinner()
+
+    try {
+      s.start('Ingerindo domínio')
+      const result = await o2IngestSkill.execute(
+        { config, engine, workspacePath, memoryPath },
+        { projectName: opts.project, memoryPath },
+      )
+      s.stop(`${result.chunksStored} chunks vetorizados`)
+
+      p.note(
+        [
+          `Bounded contexts: ${result.summary.boundedContexts.length}`,
+          `Entidades: ${result.summary.entities.length}`,
+          `Casos de uso: ${result.summary.useCases.length}`,
+          `Sumário salvo em: ${result.summaryPath}`,
+        ].join('\n'),
+        'Domínio ingerido'
+      )
+
+      p.outro('Próximo passo: o2 run plan --project ' + opts.project)
+    } catch (err) {
+      s.stop('Erro durante a ingestão')
+      p.cancel(String(err))
+      process.exit(1)
+    }
+  })
+
+runCmd
   .command('plan')
   .description('Gera o system design a partir dos vetores de domínio')
-  .option('-p, --project <name>', 'Nome do projeto')
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
   .action(() => { console.log('o2-plan — em implementação') })
 
-skillCommand
+runCmd
   .command('contract')
   .description('Gera o openapi.yaml a partir do system design')
-  .option('-p, --project <name>', 'Nome do projeto')
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
   .action(() => { console.log('o2-contract — em implementação') })
 
-skillCommand
+runCmd
   .command('build')
   .description('Implementa o código a partir do contrato OpenAPI')
-  .option('-p, --project <name>', 'Nome do projeto')
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
   .action(() => { console.log('o2-build — em implementação') })
 
-skillCommand
+runCmd
   .command('infra')
   .description('Containeriza e configura observabilidade')
-  .option('-p, --project <name>', 'Nome do projeto')
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
   .action(() => { console.log('o2-infra — em implementação') })
 
-skillCommand
+runCmd
   .command('docs')
   .description('Gera documentação de integração DX')
-  .option('-p, --project <name>', 'Nome do projeto')
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
   .action(() => { console.log('o2-docs — em implementação') })
 
-skillCommand
+runCmd
   .command('audit')
   .description('Revisa código contra OpenAPI e system design')
-  .option('-p, --project <name>', 'Nome do projeto')
+  .requiredOption('-p, --project <name>', 'Nome do projeto')
   .action(() => { console.log('o2-audit — em implementação') })
 
 program.parse()
