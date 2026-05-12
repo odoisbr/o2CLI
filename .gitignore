@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Ferramentas locais e agentes
+.claude/
+.cursor/
+.copilot/
+.aider/
+.continue/
+.codeium/
+
+# Ambiente e secrets
+.env
+.env.*
+!.env.example
+
+# Dependências e build
+node_modules/
+dist/
+*.log
+
+# Prisma
+packages/gateway/prisma/migrations/
+
+# Arquivos compilados de task (gerados em runtime)
+*.o2-task.md

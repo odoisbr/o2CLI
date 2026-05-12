@@ -1,0 +1,12 @@
+{
+  "name": "o2cli-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "dev:cli": "bun run --filter '@o2/cli' dev",
+    "dev:gateway": "bun run --filter '@o2/gateway' dev",
+    "typecheck": "bun run --filter '*' typecheck"
+  }
+}

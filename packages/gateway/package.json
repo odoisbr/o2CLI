@@ -1,0 +1,32 @@
+{
+  "name": "@o2/gateway",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@o2/shared": "workspace:*",
+    "fastify": "^4.28.0",
+    "@fastify/cors": "^8.0.0",
+    "@fastify/rate-limit": "^9.0.0",
+    "ai": "^4.0.0",
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    "@prisma/client": "^5.14.0",
+    "ioredis": "^5.4.0",
+    "zod": "^3.23.0",
+    "fastify-plugin": "^4.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "prisma": "^5.14.0",
+    "pino-pretty": "^11.0.0",
+    "bun-types": "latest"
+  }
+}

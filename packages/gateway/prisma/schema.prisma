@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  active    Boolean  @default(true)
+  quotaUsd  Float?
+  createdAt DateTime @default(now())
+  usages    Usage[]
+
+  @@index([key])
+}
+
+model Usage {
+  id               String   @id @default(cuid())
+  apiKeyId         String
+  skill            String
+  projectName      String
+  provider         String
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  costUsd          Float
+  durationMs       Int
+  success          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id])
+
+  @@index([apiKeyId, createdAt])
+  @@index([skill, createdAt])
+}
