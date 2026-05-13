@@ -74,10 +74,13 @@ export const o2IngestSkill = defineSkill<IngestInputs, IngestOutputs>({
 
     if (!response.success) throw new Error('Gateway retornou erro na geração do sumário')
 
-    // Persiste o sumário em markdown no shadow workspace
-    const summaryPath = join(inputs.memoryPath, 'backend', '2-design', 'domain-summary.md')
-    const summaryMd = formatSummaryMarkdown(response.outputs)
-    writeFileSync(summaryPath, summaryMd)
+    const designDir = join(inputs.memoryPath, 'backend', '2-design')
+
+    // Persiste JSON (consumido pelo o2-plan) e Markdown (legível por humanos)
+    const summaryJsonPath = join(designDir, 'domain-summary.json')
+    const summaryPath = join(designDir, 'domain-summary.md')
+    writeFileSync(summaryJsonPath, JSON.stringify(response.outputs, null, 2))
+    writeFileSync(summaryPath, formatSummaryMarkdown(response.outputs))
 
     return {
       chunksStored: stored,

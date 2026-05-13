@@ -2,7 +2,9 @@ import type { FastifyRequest, FastifyReply } from 'fastify'
 import { SkillPayloadSchema } from '@o2/shared'
 import { executeLLM } from '../services/llm.service'
 import { handleIngest } from '../services/skills/o2-ingest.handler'
+import { handlePlan } from '../services/skills/o2-plan.handler'
 import type { UsageRepository } from '../repositories/usage.repository'
+import type { DomainSummary } from '@o2/shared'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -65,6 +67,39 @@ export function makeSkillsController(usageRepo: UsageRepository) {
             usage: { ...result.usage, costUsd: 0 },
             provider: 'anthropic',
             model: inputs.model ?? 'claude-sonnet-4-6',
+            durationMs: result.durationMs,
+          })
+        }
+
+        if (payload.skill === 'o2-plan') {
+          const inputs = payload.inputs as {
+            domainSummary: DomainSummary
+            domainContext: string[]
+            stack: { runtime: string; framework: string; orm?: string; database?: string }
+            model?: string
+          }
+          const result = await handlePlan(inputs)
+
+          await usageRepo.create({
+            apiKeyId: req.apiKeyId,
+            skill: payload.skill,
+            projectName: payload.projectName,
+            provider: 'anthropic',
+            model: inputs.model ?? 'claude-opus-4-7',
+            promptTokens: result.usage.promptTokens,
+            completionTokens: result.usage.completionTokens,
+            costUsd: 0,
+            durationMs: result.durationMs,
+            success: true,
+          })
+
+          return reply.send({
+            success: true,
+            skill: payload.skill,
+            outputs: result.design,
+            usage: { ...result.usage, costUsd: 0 },
+            provider: 'anthropic',
+            model: inputs.model ?? 'claude-opus-4-7',
             durationMs: result.durationMs,
           })
         }

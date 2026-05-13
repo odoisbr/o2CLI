@@ -7,6 +7,7 @@ import { engineExists, readEngine, readO2Config } from './utils/config'
 import { WWW_DIR, MEMORY_DIR } from './utils/fs'
 import { join } from 'path'
 import { o2IngestSkill } from './skills/o2-ingest'
+import { o2PlanSkill } from './skills/o2-plan'
 
 const program = new Command()
 
@@ -86,7 +87,59 @@ runCmd
   .command('plan')
   .description('Gera o system design a partir dos vetores de domínio')
   .requiredOption('-p, --project <name>', 'Nome do projeto')
-  .action(() => { console.log('o2-plan — em implementação') })
+  .option('--force', 'Re-gera mesmo que o lock esteja válido')
+  .action(async (opts: { project: string; force?: boolean }) => {
+    p.intro(`o2 run plan — ${opts.project}`)
+
+    if (!engineExists()) {
+      p.cancel('Motor não configurado. Execute `o2 onboard` primeiro.')
+      process.exit(1)
+    }
+
+    const engine = readEngine()
+    const workspacePath = join(WWW_DIR, opts.project)
+    const memoryPath = join(MEMORY_DIR, opts.project)
+
+    let config
+    try {
+      config = readO2Config(workspacePath)
+    } catch {
+      p.cancel(`Projeto "${opts.project}" não encontrado. Execute \`o2 new\` primeiro.`)
+      process.exit(1)
+    }
+
+    const s = p.spinner()
+
+    try {
+      s.start('Gerando system design')
+      const result = await o2PlanSkill.execute(
+        { config, engine, workspacePath, memoryPath },
+        { projectName: opts.project, memoryPath, workspacePath, force: opts.force },
+      )
+
+      if (result.skipped) {
+        s.stop('System design já atualizado (lock válido). Use --force para re-gerar.')
+      } else {
+        s.stop('System design gerado')
+        p.note(
+          [
+            `Bounded contexts: ${result.design.boundedContexts.length}`,
+            `Entidades: ${result.design.dataModel.length}`,
+            `Total de endpoints: ${result.design.boundedContexts.reduce((acc, bc) => acc + bc.apis.length, 0)}`,
+            `Auth: ${result.design.infrastructure.auth}`,
+            `Salvo em: ${result.designMdPath}`,
+          ].join('\n'),
+          'System Design'
+        )
+      }
+
+      p.outro('Próximo passo: o2 run contract --project ' + opts.project)
+    } catch (err) {
+      s.stop('Erro durante o planejamento')
+      p.cancel(String(err))
+      process.exit(1)
+    }
+  })
 
 runCmd
   .command('contract')
