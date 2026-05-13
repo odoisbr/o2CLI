@@ -9,6 +9,7 @@ import { join } from 'path'
 import { o2IngestSkill } from './skills/o2-ingest'
 import { o2PlanSkill } from './skills/o2-plan'
 import { o2ContractSkill } from './skills/o2-contract'
+import { o2BuildSkill } from './skills/o2-build'
 
 const program = new Command()
 
@@ -200,9 +201,59 @@ runCmd
 
 runCmd
   .command('build')
-  .description('Implementa o código a partir do contrato OpenAPI')
+  .description('Gera skeleton do serviço a partir do contrato OpenAPI')
   .requiredOption('-p, --project <name>', 'Nome do projeto')
-  .action(() => { console.log('o2-build — em implementação') })
+  .option('--force', 'Re-gera mesmo que o lock esteja válido')
+  .action(async (opts: { project: string; force?: boolean }) => {
+    p.intro(`o2 run build — ${opts.project}`)
+
+    if (!engineExists()) {
+      p.cancel('Motor não configurado. Execute `o2 onboard` primeiro.')
+      process.exit(1)
+    }
+
+    const engine = readEngine()
+    const workspacePath = join(WWW_DIR, opts.project)
+    const memoryPath = join(MEMORY_DIR, opts.project)
+
+    let config
+    try {
+      config = readO2Config(workspacePath)
+    } catch {
+      p.cancel(`Projeto "${opts.project}" não encontrado. Execute \`o2 new\` primeiro.`)
+      process.exit(1)
+    }
+
+    const s = p.spinner()
+
+    try {
+      s.start('Gerando skeleton do serviço')
+      const result = await o2BuildSkill.execute(
+        { config, engine, workspacePath, memoryPath },
+        { projectName: opts.project, memoryPath, workspacePath, force: opts.force },
+      )
+
+      if (result.skipped) {
+        s.stop('Skeleton já atualizado (lock válido). Use --force para re-gerar.')
+      } else {
+        s.stop('Skeleton gerado')
+        p.note(
+          [
+            `Arquivos gerados: ${result.filesWritten}`,
+            `Arquivos preservados (já existiam): ${result.filesSkipped}`,
+            `Diretório: ${result.generatedPath}`,
+          ].join('\n'),
+          'Build do serviço'
+        )
+      }
+
+      p.outro('Próximo passo: o2 run infra --project ' + opts.project)
+    } catch (err) {
+      s.stop('Erro durante o build')
+      p.cancel(String(err))
+      process.exit(1)
+    }
+  })
 
 runCmd
   .command('infra')
